@@ -24,7 +24,7 @@ This tool is designed to analyze flight log files from custom drones, including 
 1. Clone the repository:
     ```bash
     git clone link_of_this_git
-    cd projectname
+    cd FLARE
     ```
 
 2. Install the required Python packages:
@@ -42,18 +42,57 @@ This tool uses `argparse` for handling input arguments. You can provide both the
 
 ### Basic Usage:
 ```bash
-python main.py <file.bin> <file.ulg> -o <output_db_path>
+python main.py <file.bin> -o <output_db_path>
 ```
 
 ### Arguments:
-- `filename`: 
-- `normal_filename`: 
+### Required:
+- `filename`:
+  - The fragment of the log file to be recovered.
+  - **Example**: `file.bin`
+  
 - `-o`, `--output`:
+  - Output path for the recovered data, saved as a database file.
+  - **Example**: `path/to/output/`
 
-### Example:
+### Optional:
+- `-r`, `--recovery`:
+  - Enable recovery mode.
+  - If enabled, the tool will attempt to recover deleted or corrupted log files.
+
+- `-i`, `--intact_filename`:
+  - Input intact log file (optional in recovery mode).
+  - If not provided, the firmware type must be specified for recovery.
+
+- `-f`, `--firmware`:
+  - Specify the firmware type of the drone: `ardupilot`, `px4`, or `betaflight`.
+  - Required if no intact log file is provided for recovery.
+
+- `-c`, `--cluster_size`:
+  - Cluster size for parsing (default is `4096` bytes).
+ 
+## Example Usage:
+
+### Recover a Fragmented Log File (With Recovery Mode):
 ```bash
-python main.py
+python main.py file.bin -r -f px4 -o ./result/
 ```
+
+### Parse a Log File (Without Recovery Mode):
+```bash
+python main.py file.bin -o ./result/
+```
+
+### Recover a Log File Using an Intact Log File:
+```bash
+python main.py file.bin -r -i intact_log.ulg -o ./result/
+```
+
+### Recover a Fragmented Log File (With Recovery Mode and Firmware Specified):
+```bash
+python main.py file.bin -r -f px4 -o ./result/
+```
+
 ---
 
 ## Sample Files

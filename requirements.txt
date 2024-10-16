@@ -1,1 +1,3 @@
 pymavlink
+inflect
+numpy

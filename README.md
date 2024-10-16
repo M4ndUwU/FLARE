@@ -85,7 +85,7 @@ python main.py partial_corrupt_dump_ardupilot.bin -r -i intact_file_ardupilot.bi
 
 ### Recover a Fragmented Log File (With Recovery Mode and Firmware Specified):
 ```bash
-python main.py unallocated_data_log_ardupilot.bin -r -f ardupilot -o ./result/
+python main.py unallocated_data_log_betaflight.bbl -r -f betaflight -o ./result/
 ```
 
 ---
@@ -108,6 +108,7 @@ These folders help illustrate how the tool works with actual log data. Feel free
 
 
 note: Due to the conditions of blind review, it was necessary to omit certain details.
+We will make the related sample data, which we have generated, publicly available once the paper is published.
 
 ---
 

@@ -286,8 +286,10 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
                     index = pos + 1
                 else:
                     index += 1
-            else:
+            elif pos == -1:
                 break
+            else:
+                index += 1
         return pos_arr
 
     def calculate_total_size(data):
@@ -392,18 +394,24 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
             if len(msg_name) < 1 or not all(0x30 <= byte < 128 for byte in msg_name):
                 continue
             if msg_name not in corrupted_format_msgs:
-                recovered_data += orig_msg
-                msg_type_dict[msg_name] = calculate_total_size(corrupted_msg[corrupted_msg.find(b':')+1:])
-                msg_schema_dict[msg_name] = corrupted_msg[corrupted_msg.find(b':')+1:]
+                try:
+                    msg_type_dict[msg_name] = calculate_total_size(orig_msg[orig_msg.find(b':')+1:])
+                    msg_schema_dict[msg_name] = orig_msg[orig_msg.find(b':')+1:]
+                    recovered_data += orig_msg
+                except:
+                    continue
 
         # Add rest data
         # Recovered_data adds corrupted messages that are not in the source
         for msg_name, corrupted_msg in corrupted_format_msgs.items():
             if len(msg_name) < 1 or not all(0x30 <= byte < 128 for byte in msg_name):
                 continue
-            recovered_data += corrupted_msg
-            msg_type_dict[msg_name] = calculate_total_size(corrupted_msg[corrupted_msg.find(b':')+1:])
-            msg_schema_dict[msg_name] = corrupted_msg[corrupted_msg.find(b':')+1:]
+            try:
+                msg_type_dict[msg_name] = calculate_total_size(corrupted_msg[corrupted_msg.find(b':')+1:])
+                msg_schema_dict[msg_name] = corrupted_msg[corrupted_msg.find(b':')+1:]
+                recovered_data += corrupted_msg
+            except:
+                continue
 
         return recovered_data, msg_type_dict, msg_schema_dict
 
@@ -463,7 +471,7 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
                 field_value *= 0.0000001
                 if (field_name == 'lat' and -90.0 <= field_value <= 90.0) or (field_name == 'lon' and -180.0 <= field_value <= 180.0):
                     # Check if the value has more than 6 decimal places
-                    if abs(field_value - round(field_value, 30)) > 0:
+                    if abs(field_value - round(field_value, 50)) > 0:
                         return False
                 else:
                     return False
@@ -471,7 +479,7 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
             if field_name == 'lat' or field_name == 'lon':
                 if (field_name == 'lat' and -90.0 <= field_value <= 90.0) or (field_name == 'lon' and -180.0 <= field_value <= 180.0):
                     # Check if the value has more than 6 decimal places
-                    if abs(field_value - round(field_value, 30)) > 0:
+                    if abs(field_value - round(field_value, 50)) > 0:
                         return False
                 else:
                     return False

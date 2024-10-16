@@ -103,7 +103,7 @@ These folders help illustrate how the tool works with actual log data. Feel free
 
 ### Log File Sources by Firmware:
 - Ardupilot: [Ardupilot Log File](https://github.com/ArduPilot/pymavlink/blob/master/tests/test.BIN)
-- PX4: [PX4 Log File](https://github.com/PX4/pyulog/blob/main/test/sample.ulg), [PX4 Log File2](https://data.researchdatafinder.qut.edu.au/dataset/flight-logs-of4)
+- PX4: [PX4 Log File](https://data.researchdatafinder.qut.edu.au/dataset/flight-logs-of4)
 - Betaflight: A log file without GPS information.
 
 

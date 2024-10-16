@@ -168,6 +168,10 @@ def bbl_recover(filename, orig_log_file_name, cluster_size, output):
 
         return headers
 
+    # Function to determine if ASCII printable range
+    def is_printable(data):
+        return all(32 <= byte <= 126 for byte in data)
+
     def recover_missing_header(corrupted_data, orig_data):
         # Extract the header as hex values from corrupted_data and orig_data
         corrupted_headers = extract_headers(corrupted_data)
@@ -179,12 +183,16 @@ def bbl_recover(filename, orig_log_file_name, cluster_size, output):
         for fieldname, value in orig_headers.items():
             if fieldname not in corrupted_headers:
                 # add new header
+                if not is_printable(fieldname):
+                    continue
                 new_header = b"H " + fieldname + b":" + value + b"\n"
                 #print(new_header)
                 recovered_data += new_header
 
         # Also add headers that are present in corrupted_data.
         for fieldname, value in corrupted_headers.items():
+            if not is_printable(fieldname):
+                continue
             existing_header = b"H " + fieldname + b":" + value + b"\n"
             recovered_data += existing_header
 
@@ -291,7 +299,6 @@ def bbl_recover(filename, orig_log_file_name, cluster_size, output):
     for i in range(len(final_data)):
         try:
             file_path = save_to_tmp(final_data[i])
-
             # Load a file
             parser = Parser.load(file_path)
 
@@ -351,7 +358,8 @@ def bbl_recover(filename, orig_log_file_name, cluster_size, output):
             insert_query = f"INSERT INTO `{table_name}` ({', '.join([f'`{field}`' for field in parser.field_names])}) VALUES ({', '.join(['?' for _ in parser.field_names])})"
 
             cursor.executemany(insert_query, frames_data)
-        except:
+        except Exception as e:
+            print(e)
             continue
         # commit
         conn.commit()

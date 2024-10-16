@@ -85,7 +85,7 @@ python main.py partial_corrupt_dump_ardupilot.bin -r -i intact_file_ardupilot.bi
 
 ### Recover a Fragmented Log File (With Recovery Mode and Firmware Specified):
 ```bash
-python main.py unallocated_data_log_ardupilot.bin -r -f px4 -o ./result/
+python main.py unallocated_data_log_ardupilot.bin -r -f ardupilot -o ./result/
 ```
 
 ---
@@ -103,8 +103,11 @@ These folders help illustrate how the tool works with actual log data. Feel free
 
 ### Log File Sources by Firmware:
 - Ardupilot: [Ardupilot Log File](https://github.com/ArduPilot/pymavlink/blob/master/tests/test.BIN)
-- PX4: [PX4 Log File](https://github.com/PX4/pyulog/blob/main/test/sample.ulg)
-- Betaflight: Since no publicly available sample files exist, we have used a log file without GPS data to ensure that the author cannot be identified.
+- PX4: [PX4 Log File](https://github.com/PX4/pyulog/blob/main/test/sample.ulg), [PX4 Log File2](https://data.researchdatafinder.qut.edu.au/dataset/flight-logs-of4)
+- Betaflight: A log file without GPS information.
+
+
+note: Due to the conditions of blind review, it was necessary to omit certain details.
 
 ---
 

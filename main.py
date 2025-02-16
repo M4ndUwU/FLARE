@@ -32,7 +32,7 @@ def get_match_types(type):
     elif type == "Betaflight/Cleanflight-Blackbox File":
         match_types = []
     elif type == "Ardupilot-DataFlash File":
-        match_types = ['FMT', 'ADSB', 'AHR2', 'AIS1', 'AIS4', 'ARSP', 'BCL', 'CAM', 'CMD', 'DSTL', 'EAHR', 'EV', 'FNCE', 'GPS', 'MOTB', 'OABR', 'OADJ', 'OAVG', 'ORGN', 'POS', 'RALY', 'TRIG', 'TRST']
+        match_types = ['FMT', 'ADSB', 'AHR2', 'AIS1', 'AIS4', 'ARSP', 'BAT', 'BCL', 'CAM', 'CMD', 'DSTL', 'EAHR', 'EV', 'FNCE', 'GPS', 'IMU', 'MOTB', 'OABR', 'OADJ', 'OAVG', 'ORGN', 'POS', 'RALY', 'TRIG', 'TRST']
 
     return match_types
 

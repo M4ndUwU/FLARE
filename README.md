@@ -89,6 +89,75 @@ python main.py unallocated_data_log_betaflight.bbl -r -f betaflight -o ./result/
 ```
 
 ---
+## Sample Test Data for Evaluation (Section 7)
+
+The `sample_test` directory contains log files and scripts used for the evaluation described in **Section 7 of the paper**. This directory is structured to facilitate the generation, processing, and analysis of test flight logs for both **Ardupilot** and **PX4** firmware.
+
+### Directory Structure
+```
+sample_test/
+│── original/
+│   ├── Ardupilot/
+│   │   ├── logs/
+│   │   ├── world/
+│   ├── PX4/
+│   │   ├── logs/
+│   │   ├── world/
+│   ├── flight_mission/
+│── test/
+│   ├── Ardupilot/
+│   ├── PX4/
+│── result/
+│   ├── Ardupilot/
+│   ├── PX4/
+│── calc_records_Ardupilot.py
+│── calc_records_PX4.py
+│── gen_test_log.py
+```
+
+
+### **Folder Descriptions**
+
+- **`original/`**  
+  Contains the original, unmodified log files used as the baseline for evaluation. These files serve as references for assessing recovery performance.
+
+- **`test/`**  
+  Stores the corrupted versions of the original log files. Various corruption scenarios are applied to simulate real-world data loss, including:
+  - **Header Corruption (HC)**
+  - **Data Corruption (DC)**
+  - **Footer Corruption (FC)**
+  - **Fragmented Logs (MIX)**  
+
+- **`result/`**  
+  Holds the recovered log files after processing. These logs are reconstructed using FLARE, and their integrity is evaluated by comparing them with the original files.
+
+### **Script Descriptions**
+
+- **`gen_test_log.py`**  
+  Generates test log files by applying predefined corruption models to the original log files. This script systematically alters log files to simulate different failure scenarios for evaluation.
+
+- **`calc_records_Ardupilot.py`**  
+  Analyzes and counts the number of recoverable records in **Ardupilot logs**. It is used to assess the effectiveness of the recovery process by comparing the number of extracted records across different corruption scenarios.
+
+- **`calc_records_PX4.py`**  
+  Performs the same functionality as `calc_records_Ardupilot.py`, but for **PX4 logs**. It evaluates recovery performance by identifying successfully restored records from corrupted PX4 logs.
+
+### Usage
+
+To generate test logs and evaluate recovery performance, run the following commands:
+
+```bash
+# Generate corrupted test logs
+python gen_test_log.py
+
+# Analyze recovered records for Ardupilot logs
+python calc_records_Ardupilot.py
+
+# Analyze recovered records for PX4 logs
+python calc_records_PX4.py
+```
+
+---
 
 ## Sample Files
 

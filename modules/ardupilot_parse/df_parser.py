@@ -146,22 +146,25 @@ def df_recover(filename, match_types, orig_log_file_name, cluster_size, output):
             fmt_start = data.find(b'\xA3\x95\x80', fmt_start)
             if fmt_start == -1:
                 break
+            try:
+                # Check the length of the FMT message (found in the 2nd byte).
+                fmt_length = 0x59
 
-            # Check the length of the FMT message (found in the 2nd byte).
-            fmt_length = 0x59
+                # The message name (Name) is located from the 6th byte and spans 4 bytes.
+                fmt_name = data[fmt_start + 5:fmt_start + 9].decode('ascii').strip()
 
-            # The message name (Name) is located from the 6th byte and spans 4 bytes.
-            fmt_name = data[fmt_start + 5:fmt_start + 9].decode('ascii').strip()
-
-            # Extract the entire FMT message data, including the Type and Length fields.
-            fmt_data = data[fmt_start:fmt_start + fmt_length]
-
-            # Add it to the dictionary.
-            fmt_dict[fmt_name] = fmt_data
+                # Extract the entire FMT message data, including the Type and Length fields.
+                fmt_data = data[fmt_start:fmt_start + fmt_length]
+                tt = data[fmt_start + 9:fmt_start + fmt_length].decode('ascii').strip()
+                
+                # Add it to the dictionary.
+                fmt_dict[fmt_name] = fmt_data
+            except:
+                fmt_start += 1
+                continue
 
             # Move the position to find the next FMT message.
             fmt_start += fmt_length
-
         return fmt_dict
 
     def find_next_a3_95_non_80(data, start_idx):

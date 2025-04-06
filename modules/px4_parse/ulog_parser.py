@@ -191,6 +191,24 @@ def save_db(output, info_msgs, msg_msgs, data_msgs):
 
     return
 
+def rename_px4_tables(db_path):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    table_rename_map = {
+        "vehicle_gps_position_0": "vehicle_gps_position_and_sensor_gps",
+        "vehicle_global_position_0": "vehicle_global_position_and_vehicle_global_position_groundtruth"
+    }
+
+    for old_name, new_name in table_rename_map.items():
+        # 테이블 존재 확인
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (old_name,))
+        if cursor.fetchone():
+            cursor.execute(f"ALTER TABLE {old_name} RENAME TO {new_name}")
+
+    conn.commit()
+    conn.close()
+
 def ulog_parser(ulog_file_name, match_types, output):
     ulog = ULog(ulog_file_name, None, False)
 
@@ -661,14 +679,13 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
     else:
         recover_define_section_data, msg_type_dict, msg_schema_dict = recover_define_section(corrupted_data, b'')
     # search and parse Logged Data
-    possible_to_recover = ['home_position', 'vehicle_global_position', 'vehicle_gps_position']
+    possible_to_recover = ['home_position', 'vehicle_global_position', 'vehicle_gps_position'] # sensor_gps and vehicle_global_position_groundtruth are included.
     filtered_dict = {msg_name: size for msg_name, size in msg_type_dict.items() if msg_name.decode('utf-8') in possible_to_recover}
     msg_size_values = list(set(msg_type_dict.values()))
 
     schema_filtered_dict = {msg_name: schema_data for msg_name, schema_data in msg_schema_dict.items() if msg_name.decode('utf-8') in possible_to_recover}
 
-    # for home_position, sensor_gps, vehicle_global_position, vehicle_gps_position
-    data_msgs = []
+    # for home_position, sensor_gps, vehicle_global_position, vehicle_gps_position,  vehicle_global_position_groundtruth
     data_msgs = []
     logged_data_msg_pos = find_all_ulog_msg(corrupted_data, MSG_TYPE_DATA, Data_Section_MSGS)
 
@@ -713,3 +730,4 @@ def ulog_recover(filename, orig_log_file_name, match_types, cluster_size, output
     info_msgs = find_info_and_parse_payload(corrupted_data)
 
     save_db(output, info_msgs, msg_msgs, data_msgs)
+    rename_px4_tables(output)

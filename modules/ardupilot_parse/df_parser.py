@@ -89,7 +89,7 @@ def save_db(m, types, output):
                 msgQuerySet.set_query(sql_query)
 
             # prepare data
-            filtered_data = [msg[key] for key in filtered_keys if key in msg]
+            filtered_data = [str(msg[key]) for key in filtered_keys if key in msg]
             msgQuerySet.append_data(filtered_data)
         else:
             print("what", msg)
@@ -156,7 +156,7 @@ def df_recover(filename, match_types, orig_log_file_name, cluster_size, output):
                 # Extract the entire FMT message data, including the Type and Length fields.
                 fmt_data = data[fmt_start:fmt_start + fmt_length]
                 tt = data[fmt_start + 9:fmt_start + fmt_length].decode('ascii').strip()
-                
+
                 # Add it to the dictionary.
                 fmt_dict[fmt_name] = fmt_data
             except:
@@ -220,6 +220,82 @@ def df_recover(filename, match_types, orig_log_file_name, cluster_size, output):
             recovered_fmt_data += fmt_data  # Add the original FMT data that was already present.
         return recovered_fmt_data
 
+    def build_recover_fmt_dict(recover_data, match_types):
+        """
+        Scans 'recover_data' for the pattern:
+          [0xA3, 0x95, 0x80, msg_type(1 byte), length(1 byte), name(4 bytes)]
+        and returns a dict: { msg_type: (length, name_str) },
+        but only if name_str is in match_types.
+
+        Total record size = 9 bytes:
+          3 (header) + 1 (msg_type) + 1 (length) + 4 (name)
+        """
+
+        fmt_dict = {}
+        i = 0
+        data_len = len(recover_data)
+
+        # We need at least 9 bytes per record
+        while i <= data_len - 9:
+            if (recover_data[i]   == 0xA3 and
+                recover_data[i+1] == 0x95 and
+                recover_data[i+2] == 0x80):
+
+                msg_type = recover_data[i+3]
+                length   = recover_data[i+4]
+                name_bytes = recover_data[i+5 : i+9]
+                name_str = name_bytes.rstrip(b'\x00').decode('ascii', errors='replace').strip()
+
+                # Only store if name_str is in match_types
+                if name_str in match_types:
+                    fmt_dict[msg_type] = (length, name_str)
+
+                i += 9  # move past this record
+            else:
+                i += 1
+
+        return fmt_dict
+
+    def find_all_len_verfied_a3_95_non_80(corrupted_data, recover_fmt_data):
+        """
+        Strictly verifies that the next 2 bytes after the message are 0xA3, 0x95.
+        'recover_fmt_data' should be { msg_type: (length, name_str) }.
+        Returns { offset: bytes_chunk } with only valid messages.
+        """
+        results = {}
+        i = 0
+        data_len = len(corrupted_data)
+
+        while i < data_len - 2:
+            # Check for A3 95
+            if corrupted_data[i] == 0xA3 and corrupted_data[i + 1] == 0x95:
+                msg_type = corrupted_data[i + 2]
+
+                # Skip msg_type == 0x80 and unknown types
+                if msg_type != 0x80 and msg_type in recover_fmt_data:
+                    length, name_str = recover_fmt_data[msg_type]
+                    end_pos = i + length  # index just after this message
+
+                    # 1) Check if we have enough bytes for this message
+                    if end_pos <= data_len:
+                        # 2) Strictly check if the next 2 bytes are A3 95
+                        #    We need at least end_pos + 2 bytes
+                        if end_pos + 1 < data_len:
+                            if (corrupted_data[end_pos]     == 0xA3 and
+                                corrupted_data[end_pos + 1] == 0x95):
+                                # Valid message chunk
+                                chunk = corrupted_data[i : end_pos]
+                                results[i] = chunk
+                                i += length
+                                continue
+
+            # If any check fails, move one byte forward
+            i += 1
+
+        return results
+
+
+
     def merge_data_by_cluster_size(data_dict, cluster_size):
         # Sort the dictionary by index
         sorted_data = sorted(data_dict.items(), key=lambda x: x[0])
@@ -281,7 +357,9 @@ def df_recover(filename, match_types, orig_log_file_name, cluster_size, output):
         recover_fmt_data = recover_missing_fmt(corrupted_data, b"")
 
     # Assuming find_all_a3_95_non_80(corrupted_data) returns a dictionary like {position: data}
-    corrupted_data_dict = find_all_a3_95_non_80(corrupted_data)
+    #corrupted_data_dict = find_all_a3_95_non_80(corrupted_data)
+    recover_dict = build_recover_fmt_dict(recover_fmt_data,match_types)
+    corrupted_data_dict = find_all_len_verfied_a3_95_non_80(corrupted_data, recover_dict)
     clustered_data = merge_data_by_cluster_size(corrupted_data_dict, cluster_size)
 
     # Parse

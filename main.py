@@ -28,7 +28,7 @@ def detect_type_read_file_header(log_file):
 
 def get_match_types(type):
     if type == "PX4-ULog File":
-        match_types = ['battery_status', 'event', 'home_position', 'input_rc', 'position_setpoint_triplet', 'sensor_gps', 'vehicle_global_position', 'vehicle_gps_position', 'vehicle_land_detected', 'vehicle_local_position']
+        match_types = ['battery_status', 'event', 'home_position', 'input_rc', 'position_setpoint_triplet', 'sensor_gps', 'vehicle_global_position', 'vehicle_global_position_groundtruth', 'vehicle_gps_position', 'vehicle_land_detected', 'vehicle_local_position']
     elif type == "Betaflight/Cleanflight-Blackbox File":
         match_types = []
     elif type == "Ardupilot-DataFlash File":

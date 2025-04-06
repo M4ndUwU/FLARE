@@ -67,19 +67,19 @@ test_dir = "./test/PX4/"
 target_prefixes = ["intact_a", "intact_b", "intact_c"]
 target_strings = ['battery_status', 'event', 'home_position', 'input_rc', 'position_setpoint_triplet',
                   'sensor_gps', 'vehicle_global_position', 'vehicle_gps_position', 'vehicle_land_detected',
-                  'vehicle_local_position']
+                  'vehicle_local_position', 'vehicle_global_position_groundtruth']
 
 # Search for occurrences
 px4_results = find_strings_with_prefix(db_dir, target_prefixes, target_strings)
 
-#Manual Selection
-px4_results = {'intact_a.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100']},
-'intact_b.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00', '4b00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100']},
-'intact_c.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00', '4b00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100']}}
+#Manual Selection !!!!
+px4_results = {'intact_a.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100'], 'vehicle_global_position_groundtruth': ['5600']},
+'intact_b.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00', '4b00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100'], 'vehicle_global_position_groundtruth': ['5600']},
+'intact_c.ulg': {'battery_status': ['4700'], 'event': ['5900'], 'home_position': ['0700'], 'input_rc': ['0800'], 'position_setpoint_triplet': ['0d00'], 'sensor_gps': ['4a00', '4b00'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'vehicle_land_detected': ['2000'], 'vehicle_local_position': ['2100'], 'vehicle_global_position_groundtruth': ['5600']}}
 
-px4_results = {'intact_a.ulg': {'home_position': ['0700'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00']},
-'intact_b.ulg': {'home_position': ['0700'],  'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00']},
-'intact_c.ulg': {'home_position': ['0700'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00']}}
+px4_results = {'intact_a.ulg': {'home_position': ['0700'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'sensor_gps': ['4a00'], 'vehicle_global_position_groundtruth': ['5600']},
+'intact_b.ulg': {'home_position': ['0700'],  'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'sensor_gps': ['4a00'], 'vehicle_global_position_groundtruth': ['5600']},
+'intact_c.ulg': {'home_position': ['0700'], 'vehicle_global_position': ['5f00'], 'vehicle_gps_position': ['1f00'], 'sensor_gps': ['4a00'], 'vehicle_global_position_groundtruth': ['5600']}}
 
 
 # Combine extracted sequences

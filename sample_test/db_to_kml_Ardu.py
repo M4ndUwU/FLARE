@@ -64,12 +64,12 @@ def process_folder(folder_path, output_folder):
         file_path = os.path.join(folder_path, filename)
 
         # Function 2: Process DB files
-        if filename.endswith(".db") and any(x in filename for x in ["header_section_corruption_b_", "mix_a_b_c"]):
+        if filename.endswith(".db") and any(x in filename for x in ["header_section_corruption_b_", "data_section_corruption_b_","mix_a_b_c"]):
             extract_from_db(file_path, output_folder)
 
-        # Function 3: Process TXT files (disabled)
-        # elif filename.endswith(".txt") and any(x in filename for x in ["header_section_corruption_b", "mix_a_b_c"]):
-        #     extract_from_txt(file_path, output_folder)
+        # Function 3: Process TXT files
+        elif filename.endswith(".txt") and any(x in filename for x in ["output_pymavlink_mavlogdump_intact_b"]):
+            extract_from_txt(file_path, output_folder)
 
 # Example usage
 folder_path = "./result/Ardupilot"   # Input folder path

@@ -62,10 +62,6 @@ def process_folder(folder_path, output_folder):
         if "_a_" in filename and filename.endswith(".db"):
             file_path = os.path.join(folder_path, filename)
             extract_from_db(file_path, output_folder)
-        if "mix_" in filename and filename.endswith(".db"):
-            file_path = os.path.join(folder_path, filename)
-            extract_from_db(file_path, output_folder)
-
 
     csv_folder = "./result/PX4/intact_a"
     csv_output_kml = "./kml/intacta_combined.kml"

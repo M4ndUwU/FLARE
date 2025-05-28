@@ -23,7 +23,7 @@ This tool is designed to analyze flight log files from custom drones, including 
 ### Installation Steps
 1. Clone the repository:
     ```bash
-    git clone link_of_this_git
+    git clone https://github.com/M4ndUwU/FLARE.git
     cd FLARE
     ```
 

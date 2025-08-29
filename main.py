@@ -1,4 +1,7 @@
 import argparse, os
+import sqlite3
+import json
+import webbrowser
 from datetime import datetime
 from modules.ardupilot_parse.df_parser import df_parser, df_recover
 from modules.betaflight_parse.bbl_parser import bbl_parser, bbl_recover
@@ -36,6 +39,8 @@ def get_match_types(type):
 
     return match_types
 
+
+
 def main():
     """Commande line interface"""
     parser = argparse.ArgumentParser(
@@ -48,7 +53,8 @@ def main():
     parser.add_argument('-f', '--firmware', choices=['ardupilot', 'px4', 'betaflight'], help='Firmware type (required if intact log is not provided in recovery mode)', default=None)
     parser.add_argument('-o', '--output', dest='output', action='store', required=True, help='Output path of DB file')
     parser.add_argument('-c', '--cluster_size', type=int, default=4096, help='Cluster size for parsing (default is 4096)')
-
+    parser.add_argument('-v', '--view', action='store_true', help='Generate an HTML report and open it in a web browser.')
+    parser.add_argument('--google-maps-key', dest='google_maps_key', help='Google Maps API key for enhanced map visualization (or set GOOGLE_MAPS_API_KEY environment variable)')
     # Validate that either intact_filename or firmware is provided
     args = parser.parse_args()
 
@@ -109,7 +115,299 @@ def main():
         else:
             df_parser(log_file_name, match_types, output)
     print("Finished. Result is in " + output)
+
+    if args.view:
+        html_report_path = os.path.splitext(output)[0] + '.html'
+        
+        # Check for Google Maps API key from multiple sources
+        google_maps_key = args.google_maps_key or os.environ.get('GOOGLE_MAPS_API_KEY')
+        
+        # If still not found, try to load from config file
+        if not google_maps_key:
+            try:
+                config_path = os.path.join(os.path.dirname(__file__), 'config.json')
+                if os.path.exists(config_path):
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                        google_maps_key = config.get('google_maps_api_key')
+                        if google_maps_key and google_maps_key != "YOUR_GOOGLE_MAPS_API_KEY_HERE":
+                            print("✓ Loaded Google Maps API key from config.json")
+            except Exception as e:
+                print(f"Warning: Could not load config.json: {e}")
+        
+        generate_html_report(output, html_report_path, args.recovery, google_maps_key)
+        print(f"HTML report generated: {html_report_path}")
+        
+        if google_maps_key:
+            print("✓ Using Google Maps API for enhanced visualization")
+        else:
+            print("⚠ Using default map (Google Maps API key not provided)")
+            print("   To enable Google Maps, set GOOGLE_MAPS_API_KEY environment variable or use --google-maps-key")
+        
+        try:
+            webbrowser.open(f'file://{os.path.abspath(html_report_path)}')
+            print("Opening HTML report in web browser...")
+        except Exception as e:
+            print(f"Could not open browser automatically: {e}")
+            print(f"Please open the file manually: {html_report_path}")
+
     return output
+
+def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps_api_key=None):
+    """Generate HTML report with map and table visualization of GPS data"""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Get database type by checking available tables
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    tables = [row[0] for row in cursor.fetchall()]
+    
+    gps_data = []
+    firmware_type = "Unknown"
+    columns = ["Timestamp", "Latitude", "Longitude", "Altitude", "Speed"]
+    
+    # Check if it's Ardupilot (GPS table)
+    if 'GPS' in tables:
+        try:
+            cursor.execute("""
+                SELECT timestamp, Lat, Lng, Alt, Spd 
+                FROM GPS 
+                WHERE Lat IS NOT NULL AND Lng IS NOT NULL
+                ORDER BY timestamp
+            """)
+            gps_data = cursor.fetchall()
+            if gps_data:
+                firmware_type = "Ardupilot"
+                columns = ["Timestamp", "Latitude", "Longitude", "Altitude", "Speed"]
+        except sqlite3.OperationalError:
+            pass
+        
+    # Check if it's Betaflight (LOG_# tables)
+    if not gps_data and any(table.startswith('LOG_') for table in tables):
+        log_tables = [table for table in tables if table.startswith('LOG_')]
+        for table in log_tables:
+            # Try different possible column name formats for Betaflight
+            column_queries = [
+                f"""SELECT time, GPS_coord[0], GPS_coord[1], GPS_altitude, GPS_speed 
+                    FROM {table} 
+                    WHERE GPS_coord[0] IS NOT NULL AND GPS_coord[1] IS NOT NULL
+                    ORDER BY CAST(time AS INTEGER) ASC""",
+                f"""SELECT time, "GPS_coord[0]", "GPS_coord[1]", GPS_altitude, GPS_speed 
+                    FROM {table} 
+                    WHERE "GPS_coord[0]" IS NOT NULL AND "GPS_coord[1]" IS NOT NULL
+                    ORDER BY CAST(time AS INTEGER) ASC""",
+                f"""SELECT time, GPS_lat, GPS_lon, GPS_altitude, GPS_speed 
+                    FROM {table} 
+                    WHERE GPS_lat IS NOT NULL AND GPS_lon IS NOT NULL
+                    ORDER BY CAST(time AS INTEGER) ASC""",
+                f"""SELECT time, lat, lon, altitude, speed 
+                    FROM {table} 
+                    WHERE lat IS NOT NULL AND lon IS NOT NULL
+                    ORDER BY CAST(time AS INTEGER) ASC"""
+            ]
+            
+            for query in column_queries:
+                try:
+                    cursor.execute(query)
+                    table_data = cursor.fetchall()
+                    if table_data:
+                        gps_data.extend(table_data)
+                        firmware_type = "Betaflight"
+                        columns = ["Time (usec)", "Latitude", "Longitude", "Altitude", "Speed"]
+                        break
+                except sqlite3.OperationalError:
+                    continue
+            if gps_data:
+                break
+        
+    # Check if it's PX4 (vehicle_gps_position_0 table)
+    if not gps_data and 'vehicle_gps_position_0' in tables:
+        try:
+            cursor.execute("""
+                SELECT timestamp, latitude_deg, longitude_deg, altitude_msl_m, vel_m_s 
+                FROM vehicle_gps_position_0 
+                WHERE latitude_deg IS NOT NULL AND longitude_deg IS NOT NULL
+                ORDER BY CAST(timestamp AS INTEGER) ASC
+            """)
+            gps_data = cursor.fetchall()
+            if gps_data:
+                firmware_type = "PX4"
+                columns = ["Timestamp (usec)", "Latitude", "Longitude", "Altitude (MSL)", "Velocity (m/s)"]
+        except sqlite3.OperationalError:
+            pass
+    
+    # Generic GPS data search if no specific firmware detected
+    if not gps_data:
+        print("No specific firmware detected, searching for GPS data in all tables...")
+        for table in tables:
+            try:
+                # Get table schema
+                cursor.execute(f"PRAGMA table_info({table})")
+                columns_info = cursor.fetchall()
+                column_names = [col[1] for col in columns_info]
+                
+                # Look for common GPS column patterns
+                lat_cols = [col for col in column_names if 'lat' in col.lower()]
+                lng_cols = [col for col in column_names if any(x in col.lower() for x in ['lng', 'lon', 'long'])]
+                time_cols = [col for col in column_names if any(x in col.lower() for x in ['time', 'timestamp'])]
+                alt_cols = [col for col in column_names if any(x in col.lower() for x in ['alt', 'height'])]
+                speed_cols = [col for col in column_names if any(x in col.lower() for x in ['speed', 'vel', 'spd'])]
+                
+                if lat_cols and lng_cols and time_cols:
+                    lat_col = lat_cols[0]
+                    lng_col = lng_cols[0]
+                    time_col = time_cols[0]
+                    alt_col = alt_cols[0] if alt_cols else 'NULL'
+                    speed_col = speed_cols[0] if speed_cols else 'NULL'
+                    
+                    query = f"""
+                        SELECT {time_col}, {lat_col}, {lng_col}, {alt_col}, {speed_col}
+                        FROM {table}
+                        WHERE {lat_col} IS NOT NULL AND {lng_col} IS NOT NULL
+                        ORDER BY {time_col}
+                    """
+                    
+                    cursor.execute(query)
+                    table_data = cursor.fetchall()
+                    if table_data:
+                        gps_data.extend(table_data)
+                        firmware_type = f"Generic ({table})"
+                        columns = ["Timestamp", "Latitude", "Longitude", "Altitude", "Speed"]
+                        print(f"Found GPS data in table: {table}")
+                        break
+                        
+            except sqlite3.OperationalError:
+                continue
+    
+    conn.close()
+    
+    if not gps_data:
+        raise ValueError("No GPS data found in the database")
+    
+    # Convert data for JavaScript
+    map_points = []
+    table_rows = []
+    
+    for row in gps_data:
+        if firmware_type == "Ardupilot":
+            timestamp, lat, lng, alt, spd = row
+            # Convert to float for formatting, handle None values
+            lat_float = float(lat) if lat is not None else 0.0
+            lng_float = float(lng) if lng is not None else 0.0
+            alt_float = float(alt) if alt is not None else 0.0
+            spd_float = float(spd) if spd is not None else 0.0
+            
+            map_points.append({
+                'lat': lat_float,
+                'lng': lng_float,
+                'timestamp': str(timestamp) if timestamp else '',
+                'altitude': alt_float,
+                'speed': spd_float
+            })
+            table_rows.append([str(timestamp), f"{lat_float:.6f}", f"{lng_float:.6f}", f"{alt_float:.2f}", f"{spd_float:.2f}"])
+            
+        elif firmware_type == "Betaflight":
+            time, lat, lng, alt, spd = row
+            # Convert to float for formatting, handle None values
+            lat_float = float(lat) if lat is not None else 0.0
+            lng_float = float(lng) if lng is not None else 0.0
+            alt_float = float(alt) if alt is not None else 0.0
+            spd_float = float(spd) if spd is not None else 0.0
+            
+            map_points.append({
+                'lat': lat_float,
+                'lng': lng_float,
+                'timestamp': str(time) if time else '',
+                'altitude': alt_float,
+                'speed': spd_float
+            })
+            table_rows.append([str(time), f"{lat_float:.6f}", f"{lng_float:.6f}", f"{alt_float:.2f}", f"{spd_float:.2f}"])
+            
+        elif firmware_type == "PX4":
+            timestamp, lat, lng, alt, vel = row
+            # Convert to float for formatting, handle None values
+            lat_float = float(lat) if lat is not None else 0.0
+            lng_float = float(lng) if lng is not None else 0.0
+            alt_float = float(alt) if alt is not None else 0.0
+            vel_float = float(vel) if vel is not None else 0.0
+            
+            map_points.append({
+                'lat': lat_float,
+                'lng': lng_float,
+                'timestamp': str(timestamp) if timestamp else '',
+                'altitude': alt_float,
+                'speed': vel_float
+            })
+            table_rows.append([str(timestamp), f"{lat_float:.6f}", f"{lng_float:.6f}", f"{alt_float:.2f}", f"{vel_float:.2f}"])
+            
+        else:  # Generic or Unknown firmware type
+            timestamp, lat, lng, alt, spd = row
+            # Convert to float for formatting, handle None values
+            lat_float = float(lat) if lat is not None else 0.0
+            lng_float = float(lng) if lng is not None else 0.0
+            alt_float = float(alt) if alt is not None else 0.0
+            spd_float = float(spd) if spd is not None else 0.0
+            
+            map_points.append({
+                'lat': lat_float,
+                'lng': lng_float,
+                'timestamp': str(timestamp) if timestamp else '',
+                'altitude': alt_float,
+                'speed': spd_float
+            })
+            table_rows.append([str(timestamp), f"{lat_float:.6f}", f"{lng_float:.6f}", f"{alt_float:.2f}", f"{spd_float:.2f}"])
+    
+    # Calculate center point for map
+    if map_points:
+        center_lat = sum(point['lat'] for point in map_points) / len(map_points)
+        center_lng = sum(point['lng'] for point in map_points) / len(map_points)
+    else:
+        center_lat, center_lng = 0, 0
+    
+    # Read template file
+    template_path = os.path.join(os.path.dirname(__file__), 'templates', 'gps_report_template.html')
+    try:
+        with open(template_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Template file not found: {template_path}. Please ensure the templates directory exists with gps_report_template.html file.")
+    
+    # Prepare template variables
+    table_headers_html = ''.join(f'<th>{col}</th>' for col in columns)
+    table_rows_html = ''
+    for row in table_rows:
+        row_html = ''.join(f'<td>{cell}</td>' for cell in row)
+        table_rows_html += f'<tr>{row_html}</tr>'
+    
+    # Determine analysis type for title
+    analysis_type = "Recovery & Analysis" if is_recovery_mode else "Analysis"
+    
+    # Set Google Maps API key
+    api_key = google_maps_api_key if google_maps_api_key else "YOUR_GOOGLE_MAPS_API_KEY"
+    
+    template_vars = {
+        'firmware_type': firmware_type,
+        'total_points': len(map_points),
+        'center_lat': center_lat,
+        'center_lng': center_lng,
+        'gps_points_json': json.dumps(map_points),
+        'table_headers': table_headers_html,
+        'table_rows': table_rows_html,
+        'analysis_type': analysis_type,
+        'google_maps_api_key': api_key
+    }
+    
+    # Generate HTML using template with safe substitution
+    html_content = template_content
+    for key, value in template_vars.items():
+        placeholder = f'${key}'
+        html_content = html_content.replace(placeholder, str(value))
+        print(f"Replacing {placeholder} with {str(value)[:50]}...")  # Debug info
+    
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+    
+    print(f"HTML report generated: {html_path}")
 
 if __name__ == '__main__':
     try:

@@ -71,6 +71,11 @@ python main.py <file.bin> -o <output_db_path>
 - `-c`, `--cluster_size`:
   - Cluster size for parsing (default is `4096` bytes).
 
+- `-v`, `--view`:
+  - Generate an HTML report with interactive map visualization and open it in a web browser.
+  - The report includes GPS flight path visualization and data table.
+  - Requires internet connection for map tiles.
+
 ## Example Usage:
 
 ### Parse a Log File (Without Recovery Mode):
@@ -86,6 +91,16 @@ python main.py partial_corrupt_dump_ardupilot.bin -r -i intact_file_ardupilot.bi
 ### Recover a Fragmented Log File (With Recovery Mode and Firmware Specified):
 ```bash
 python main.py unallocated_data_log_betaflight.bbl -r -f betaflight -o ./result/
+```
+
+### Generate HTML Report with Map Visualization:
+```bash
+python main.py intact_file_ardupilot.bin -o ./result/ --view
+```
+
+### Recover and Generate HTML Report:
+```bash
+python main.py partial_corrupt_dump_ardupilot.bin -r -i intact_file_ardupilot.bin -o ./result/ --view
 ```
 
 ---
@@ -128,10 +143,10 @@ sample_test/
 
 - **`test/`**  
   Stores the corrupted versions of the original log files. Various corruption scenarios are applied to simulate real-world data loss, including:
-  - **Header Corruption (HC)**
-  - **Data Corruption (DC)**
-  - **Footer Corruption (FC)**
-  - **Fragmented Logs (MIX)**  
+  - **First 50% of the Header (Header50)**
+  - **Entire Header + First Part of Data (First25)**
+  - **Last 25% of the File (Last25)**
+  - **Fragmented + Randomly Rearranged (Frag50)**  
 
 - **`result/`**  
   Holds the recovered log files after processing. These logs are reconstructed using FLARE, and their integrity is evaluated by comparing them with the original files.

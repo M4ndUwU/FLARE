@@ -104,7 +104,7 @@ python main.py partial_corrupt_dump_ardupilot.bin -r -i intact_file_ardupilot.bi
 ```
 
 ---
-## Sample Test Data for Evaluation (Section 7)
+## Sample Test Data for Evaluation (Section 8)
 
 The `sample_test` directory contains log files and scripts used for the evaluation described in **Section 7 of the paper**. This directory is structured to facilitate the generation, processing, and analysis of test flight logs for both **Ardupilot** and **PX4** firmware.
 

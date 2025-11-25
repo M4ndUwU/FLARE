@@ -147,7 +147,7 @@ def corrupt_header_section(src, dest_dir):
 
     corruption_point = start_data_seciton // 2  # remove 50% of Header(definition) Section
     corrupted_data = data[corruption_point:]
-    dest_path = os.path.join(dest_dir, f"header_section_corruption_{os.path.basename(src).split('.')[0]}.bin")
+    dest_path = os.path.join(dest_dir, f"Header50_{os.path.basename(src).split('.')[0]}.bin")
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
@@ -157,7 +157,7 @@ def corrupt_data_section(src, dest_dir):
         data = f.read()
     corruption_point = len(data) // 4  # Remove 25%
     corrupted_data = data[corruption_point:]
-    dest_path = os.path.join(dest_dir, f"data_section_corruption_{os.path.basename(src).split('.')[0]}.bin")
+    dest_path = os.path.join(dest_dir, f"First25_{os.path.basename(src).split('.')[0]}.bin")
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
@@ -167,12 +167,12 @@ def corrupt_footer_section(src, dest_dir):
         data = f.read()
     corruption_point = len(data) * 3 // 4  # Remove Last 25%
     corrupted_data = data[:corruption_point]
-    dest_path = os.path.join(dest_dir, f"footer_corruption_{os.path.basename(src).split('.')[0]}.bin")
+    dest_path = os.path.join(dest_dir, f"Last25_{os.path.basename(src).split('.')[0]}.bin")
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
 
-def create_mixed_log(log_files, dest_dir):
+def create_mixed_log(log_files, dest_dir, seed):
     chunks = []
     for log_file in log_files:
         with open(log_file, 'rb') as f:
@@ -180,12 +180,13 @@ def create_mixed_log(log_files, dest_dir):
             chunk_size = 8192  # 8KB
             chunks.extend([data[i:i+chunk_size] for i in range(0, len(data), chunk_size)])
 
+    random.seed(seed)  # Set random seed
     random.shuffle(chunks)  # Random Mix
     mixed_chunks = chunks[:len(chunks) // 2]  # Select half chunks
     mixed_data = b''.join(mixed_chunks)
 
     firmware_name = os.path.basename(os.path.dirname(log_files[0]))
-    mixed_filename = f"mix_{'_'.join([os.path.basename(f).split('.')[0] for f in log_files])}.bin"
+    mixed_filename = f"Frag50_{seed}_{'_'.join([os.path.basename(f).split('.')[0] for f in log_files])}.bin"
     dest_path = os.path.join(dest_dir, mixed_filename)
     with open(dest_path, 'wb') as f:
         f.write(mixed_data)
@@ -208,7 +209,9 @@ def process_firmware_logs(original_root):
                 corrupt_footer_section(log_file, test_dir)
 
             if log_files:
-                create_mixed_log(log_files, test_dir)
+                # Create 5 mixed log files with different random seeds
+                for seed in range(5):
+                    create_mixed_log(log_files, test_dir, seed)
 
 if __name__ == "__main__":
     process_firmware_logs("./original")

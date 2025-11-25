@@ -1,4 +1,5 @@
 import os
+import math
 
 def find_strings_with_prefix(directory, target_prefixes, target_strings):
     """Searches for target strings preceded by 0x00 0x41 and three unknown bytes, extracts all occurrences of the preceding 2 bytes."""
@@ -46,8 +47,20 @@ def count_modified_sequences(directory, prefix_map, combined_results):
         print(f"Directory not found: {directory}")
         return results
 
-    for prefix, suffix in prefix_map.items():
-        relevant_files = [f for f in os.listdir(directory) if f.endswith(suffix)]
+    files = os.listdir(directory)
+
+    for prefix, rule in prefix_map.items():
+        if isinstance(rule, dict):
+            match_type = rule.get("type", "suffix")
+            match_value = rule.get("value", "")
+        else:
+            match_type = "suffix"
+            match_value = rule
+
+        if match_type == "prefix":
+            relevant_files = [f for f in files if f.startswith(match_value)]
+        else:
+            relevant_files = [f for f in files if f.endswith(match_value)]
 
         if prefix in combined_results and combined_results[prefix]:
             sequences = [bytes([0x00, 0x44]) + bytes.fromhex(seq) for seq in combined_results[prefix] if len(seq) == 4]
@@ -97,7 +110,7 @@ prefix_map = {
     "intact_a": "_a.bin",
     "intact_b": "_b.bin",
     "intact_c": "_c.bin",
-    "mix": "mix_"
+    "mix": {"type": "prefix", "value": "Frag50_"}
 }
 
 # Count occurrences in test directory
@@ -107,3 +120,20 @@ test_results = count_modified_sequences(test_dir, prefix_map, combined_results)
 print("\nByte Sequence Count in ./test/PX4/:")
 for file, total_count in test_results.items():
     print(f"{file}: {total_count}")
+
+# Frag50 stats
+frag50_results = {file: count for file, count in test_results.items() if file.startswith("Frag50_")}
+if frag50_results:
+    def calc_mean_std(values):
+        if not values:
+            return 0.0, 0.0
+        mean = sum(values) / len(values)
+        variance = sum((value - mean) ** 2 for value in values) / len(values)
+        return mean, math.sqrt(variance)
+
+    print("\nFrag50 Byte Sequence Counts:")
+    for file, total_count in frag50_results.items():
+        print(f"{file}: {total_count}")
+
+    mean, std_dev = calc_mean_std(list(frag50_results.values()))
+    print(f"Frag50 Mean: {mean:.2f}, Std Dev: {std_dev:.2f}")

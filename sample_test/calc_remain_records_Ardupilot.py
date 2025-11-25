@@ -24,8 +24,8 @@ def get_fmt_types(db_path, target_names):
         conn.close()
     return result
 
-def parse_messages_strict_next_header(data, all_dict):
-    """Parses data with length check and requires next two bytes to be A3 95."""
+def parse_messages_len_only(data, all_dict):
+    """Loosely parses messages: matches 0xA3 0x95 <type> and trusts FMT length only."""
     i = 0
     data_len = len(data)
     counts = {}
@@ -35,13 +35,11 @@ def parse_messages_strict_next_header(data, all_dict):
             msg_type = data[i+2]
             if msg_type in all_dict:
                 length, name_str = all_dict[msg_type]
-                end_pos = i + length
-                if end_pos <= data_len and (end_pos + 1) < data_len:
-                    if data[end_pos] == 0xA3 and data[end_pos + 1] == 0x95:
-                        key = (msg_type, name_str)
-                        counts[key] = counts.get(key, 0) + 1
-                        i += length
-                        continue
+                key = (msg_type, name_str)
+                counts[key] = counts.get(key, 0) + 1
+                step = max(length + 3, 3)
+                i += step
+                continue
         i += 1
 
     return counts
@@ -69,6 +67,13 @@ def main():
         for t_val, (length_val, name_str) in d.items():
             all_dict_global[t_val] = (length_val, name_str)
 
+    print(f"[DEBUG] Loaded FMT entries: {len(all_dict_global)}")
+    if not all_dict_global:
+        print("[DEBUG] No FMT data loaded; verify DB files and target_names.")
+    else:
+        sample_items = list(all_dict_global.items())[:5]
+        print(f"[DEBUG] Sample entries: {sample_items}")
+
     if not os.path.exists(test_dir):
         print(f"Directory not found: {test_dir}")
         return
@@ -79,7 +84,9 @@ def main():
         if os.path.isfile(filepath):
             with open(filepath, "rb") as f:
                 data = f.read()
-            counts = parse_messages_strict_next_header(data, all_dict_global)
+            counts = parse_messages_len_only(data, all_dict_global)
+            total_hits = sum(counts.values())
+            print(f"[DEBUG] {filename}: matched types={len(counts)}, total hits={total_hits}")
             # Sum only non-FMT
             nonfmt_count = sum(
                 c for ((_, name_str), c) in counts.items() if name_str != "FMT"

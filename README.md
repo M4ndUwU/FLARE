@@ -8,10 +8,72 @@ This tool is designed to analyze flight log files from custom drones, including 
 ---
 
 ## Table of Contents
-1. [Installation](#installation)
-2. [Usage](#usage)
-3. [Sample Files](#sample-files)
-4. [Dependencies](#dependencies)
+1. [Supported Message Types](#support-types)
+2. [Installation](#installation)
+3. [Usage](#usage)
+4. [Sample Files](#sample-files)
+5. [Dependencies](#dependencies)
+
+---
+## Support Message Types
+### 1. ArduPilot (Dataflash Logs)
+
+| Type | Description |
+| :--- | :--- |
+| **ADSB** | Broadcast detected vehicle information |
+| **FNCE** | Currently loaded Geo Fence points |
+| **AHR2** | Backup Attitude Heading Reference System data |
+| **GPS** | Information received from GNSS systems |
+| **AIS1** | ‘Position report’ AIS message |
+| **MOTB** | Motor mixer information (motor fail flag) |
+| **AIS4** | ‘Base Station Report’ AIS message |
+| **OABR** | Object avoidance (Bendy Ruler) diagnostics |
+| **ARSP** | Airspeed sensor data |
+| **OADJ** | Object avoidance (Dijkstra) diagnostics |
+| **BAT** | Battery Voltage and Temperature data |
+| **BCL** | Battery cell Voltage information |
+| **IMU** | Inertial Measurement Unit data |
+| **OAVG** | Object avoidance path planning visgraph points |
+| **CAM** | Camera shutter information |
+| **ORGN** | Vehicle navigation origin |
+| **CMD** | Executed mission command information |
+| **POS** | Canonical vehicle position |
+| **DSTL** | Deepstall Landing data |
+| **RALY** | Rally point information |
+| **EAHR** | External AHRS data |
+| **TRIG** | Camera shutter information |
+| **EV** | Specifically coded event message |
+| **TRST** | Torqeedo System Stat (include Battery, motor) |
+
+### 2. PX4 (ULog)
+
+| Data | Description |
+| :--- | :--- |
+| **battery_status** | Battery status and operating time |
+| **event** | Log level |
+| **home_position** | Position set as the home position |
+| **input_rc** | Remote controller input values |
+| **position_setpoint_triplet** | Navigation waypoint triplet (previous, current, next) |
+| **sensor_gps** | Latitude and longitude coordinates |
+| **vehicle_global_position** | Latitude and longitude coordinates |
+| **vehicle_global_position_groundtruth** | Ground truth coordinates (sim/replay) |
+| **vehicle_gps_position** | Latitude and longitude coordinates from GPS |
+| **vehicle_land_detected** | Status flags for landed state detection |
+| **vehicle_local_position** | Local position coordinates (NED frame) |
+
+### 3. Betaflight (Blackbox)
+
+| Field / Frame | Description |
+| :--- | :--- |
+| **GPS** | Latitude, Longitude, Altitude, Ground Speed |
+| **rcCommand** | Stick inputs from the radio controller (Roll, Pitch, Yaw, Throttle) |
+| **vbatLatest** | Main battery voltage reading |
+| **amperageLatest** | Current draw information |
+| **gyroADC** | Raw Gyroscope sensor readings |
+| **accSmooth** | Smoothed Accelerometer sensor readings |
+| **motor** | Command values sent to ESCs/Motors |
+| **flightModeFlags** | Active flight modes (e.g., Angle, Horizon, Air Mode) |
+| **axis** | Rate and Angle data for Roll, Pitch, and Yaw |
 
 ---
 

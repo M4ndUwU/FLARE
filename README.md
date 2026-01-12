@@ -100,6 +100,8 @@ This tool is designed to analyze flight log files from custom drones, including 
 
 ## Usage
 
+<img width="4289" height="1874" alt="Figure_12" src="https://github.com/user-attachments/assets/4237ce25-0d8a-49db-8b01-74cc53c8225d" />
+
 This tool uses `argparse` for handling input arguments. You can provide both the corrupted log file fragment and a complete log file for comparison and recovery.
 
 ### Basic Usage:

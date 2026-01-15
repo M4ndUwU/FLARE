@@ -299,8 +299,8 @@ def bbl_recover(filename, orig_log_file_name, cluster_size, output):
     for i in range(len(final_data)):
         try:
             file_path = save_to_tmp(final_data[i])
-            # Load a file
-            parser = Parser.load(file_path)
+            # Load a file with recovery mode enabled
+            parser = Parser.load(file_path, recovery_mode=True)
 
             if i == 0:
                 # create headers table

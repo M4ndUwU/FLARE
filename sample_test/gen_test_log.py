@@ -9,6 +9,18 @@ def ensure_dir(directory):
 
 def copy_intact(src, dest_dir):
     dest_path = os.path.join(dest_dir, f"intact_{os.path.basename(src)}")
+    # Remove existing file if it exists
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except (PermissionError, OSError):
+            # Try to make file writable on Windows
+            try:
+                import stat
+                os.chmod(dest_path, stat.S_IWRITE)
+                os.remove(dest_path)
+            except Exception:
+                pass
     shutil.copy2(src, dest_path)
     return dest_path
 
@@ -53,6 +65,7 @@ def corrupt_header_section(src, dest_dir):
     def find_last_printable_header(data):
         """
         Finds the last position in the data where the fieldname is entirely printable.
+        Returns the position after the last header's newline (start of data section).
         """
         def extract_headers(data):
             """
@@ -92,17 +105,59 @@ def corrupt_header_section(src, dest_dir):
             # Function to determine if ASCII printable range
             return all(32 <= byte <= 126 for byte in data)
 
+        def find_iframe(data, index=0):
+            """Find the first I-frame (data section start)"""
+            exclude_list = [b'PID', b'H I ', b'Field I ', b'axisI[', b'loopIteration']
+            
+            while True:
+                first_iframe_index = data.find(b'I', index)
+                if first_iframe_index == -1:
+                    return -1
+                
+                surrounding_text = data[max(0, first_iframe_index-10):first_iframe_index+10]
+                exclude_found = False
+                for exclude in exclude_list:
+                    if exclude in surrounding_text:
+                        exclude_found = True
+                        index = first_iframe_index + 1
+                        break
+                
+                if not exclude_found:
+                    return first_iframe_index
+            return -1
+
+        # Try to find the first I-frame (more accurate data section start)
+        first_iframe_pos = find_iframe(data)
+        if first_iframe_pos != -1:
+            # Find the last header before the first I-frame
+            headers = extract_headers(data[:first_iframe_pos])
+            last_position = -1
+            
+            for fieldname in headers.keys():
+                if is_printable(fieldname):
+                    position = data.find(b'H ' + fieldname)
+                    if position != -1 and position < first_iframe_pos:
+                        last_position = max(last_position, position)
+                        last_position = data.find(b'\n', last_position)
+            
+            # Return the position after last header, or first I-frame if no headers found
+            if last_position != -1:
+                return last_position + 1
+            else:
+                return first_iframe_pos
+        
+        # Fallback to original logic if no I-frame found
         headers = extract_headers(data)
         last_position = -1
 
         for fieldname in headers.keys():
             if is_printable(fieldname):
-                # Find the last occurrence of the printable fieldname in the data
-                position = data.find(b'H ' + fieldname.encode())
+                position = data.find(b'H ' + fieldname)
                 if position != -1:
                     last_position = max(last_position, position)
                     last_position = data.find(b'\n', last_position)
-        return last_position
+        
+        return last_position + 1 if last_position != -1 else -1
 
     def find_next_a3_95_non_80(data, start_idx):
         # Find the next pattern starting with 'A3 95', but where the byte following it is not '80', excluding FMT.
@@ -144,10 +199,28 @@ def corrupt_header_section(src, dest_dir):
     elif type == "Ardupilot-DataFlash File":
         start_data_seciton = find_next_a3_95_non_80(data, 0)
 
-
-    corruption_point = start_data_seciton // 2  # remove 50% of Header(definition) Section
+    # Calculate corruption point: remove 50% of Header(definition) Section
+    # Header starts at 0, ends at start_data_section
+    # So corruption_point = (0 + start_data_section) // 2 = start_data_section // 2
+    if start_data_seciton == -1 or start_data_seciton == 0:
+        # If data section not found or at start, use 25% of file as fallback
+        corruption_point = len(data) // 4
+    else:
+        corruption_point = start_data_seciton // 2  # remove 50% of Header(definition) Section
+    
     corrupted_data = data[corruption_point:]
     dest_path = os.path.join(dest_dir, f"Header50_{os.path.basename(src).split('.')[0]}.bin")
+    # Remove existing file if it exists
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except (PermissionError, OSError):
+            try:
+                import stat
+                os.chmod(dest_path, stat.S_IWRITE)
+                os.remove(dest_path)
+            except Exception:
+                pass
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
@@ -158,6 +231,17 @@ def corrupt_data_section(src, dest_dir):
     corruption_point = len(data) // 4  # Remove 25%
     corrupted_data = data[corruption_point:]
     dest_path = os.path.join(dest_dir, f"First25_{os.path.basename(src).split('.')[0]}.bin")
+    # Remove existing file if it exists
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except (PermissionError, OSError):
+            try:
+                import stat
+                os.chmod(dest_path, stat.S_IWRITE)
+                os.remove(dest_path)
+            except Exception:
+                pass
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
@@ -168,12 +252,28 @@ def corrupt_footer_section(src, dest_dir):
     corruption_point = len(data) * 3 // 4  # Remove Last 25%
     corrupted_data = data[:corruption_point]
     dest_path = os.path.join(dest_dir, f"Last25_{os.path.basename(src).split('.')[0]}.bin")
+    # Remove existing file if it exists
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except (PermissionError, OSError):
+            try:
+                import stat
+                os.chmod(dest_path, stat.S_IWRITE)
+                os.remove(dest_path)
+            except Exception:
+                pass
     with open(dest_path, 'wb') as f:
         f.write(corrupted_data)
     return dest_path
 
-def create_mixed_log(log_files, dest_dir, seed):
+def create_mixed_log(log_files, dest_dir, seed, firmware_type=None):
     chunks = []
+    
+    # For Betaflight, use only one file
+    if firmware_type == "Betaflight":
+        log_files = [log_files[0]] if log_files else []
+    
     for log_file in log_files:
         with open(log_file, 'rb') as f:
             data = f.read()
@@ -188,11 +288,33 @@ def create_mixed_log(log_files, dest_dir, seed):
     firmware_name = os.path.basename(os.path.dirname(log_files[0]))
     mixed_filename = f"Frag50_{seed}_{'_'.join([os.path.basename(f).split('.')[0] for f in log_files])}.bin"
     dest_path = os.path.join(dest_dir, mixed_filename)
+    # Remove existing file if it exists
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except (PermissionError, OSError):
+            try:
+                import stat
+                os.chmod(dest_path, stat.S_IWRITE)
+                os.remove(dest_path)
+            except Exception:
+                pass
     with open(dest_path, 'wb') as f:
         f.write(mixed_data)
     return dest_path
 
 def process_firmware_logs(original_root):
+    def detect_firmware_type_from_name(firmware_name):
+        """Detect firmware type from directory name"""
+        firmware_lower = firmware_name.lower()
+        if 'ardupilot' in firmware_lower:
+            return "Ardupilot"
+        elif 'px4' in firmware_lower:
+            return "PX4"
+        elif 'betaflight' in firmware_lower:
+            return "Betaflight"
+        return None
+    
     for firmware in os.listdir(original_root):
         logs_dir = os.path.join(original_root, firmware, "logs")
 
@@ -202,6 +324,8 @@ def process_firmware_logs(original_root):
 
             log_files = [os.path.join(logs_dir, f) for f in os.listdir(logs_dir) if os.path.isfile(os.path.join(logs_dir, f))]
 
+            firmware_type = detect_firmware_type_from_name(firmware)
+
             for log_file in log_files:
                 copy_intact(log_file, test_dir)
                 corrupt_header_section(log_file, test_dir)
@@ -210,8 +334,15 @@ def process_firmware_logs(original_root):
 
             if log_files:
                 # Create 5 mixed log files with different random seeds
-                for seed in range(5):
-                    create_mixed_log(log_files, test_dir, seed)
+                # For Betaflight, create mixed log for each file individually
+                if firmware_type == "Betaflight":
+                    for log_file in log_files:
+                        for seed in range(5):
+                            create_mixed_log([log_file], test_dir, seed, firmware_type)
+                else:
+                    # For Ardupilot and PX4, use all files together
+                    for seed in range(5):
+                        create_mixed_log(log_files, test_dir, seed, firmware_type)
 
 if __name__ == "__main__":
     process_firmware_logs("./original")

@@ -32,10 +32,12 @@ class Parser:
     """Parse and iterate over decoded frames.
     """
 
-    def __init__(self, reader: Reader):
+    def __init__(self, reader: Reader, recovery_mode: bool = False):
         """
         :param reader: The `.Reader` used to iterate over the relevant bits of bytes
         :type reader: Reader
+        :param recovery_mode: If True, skip P frames that don't have a preceding I frame
+        :type recovery_mode: bool
         """
         self._reader = reader
         self._events = []  # type: List[Event]
@@ -43,6 +45,7 @@ class Parser:
         self._field_names = []  # type: List[str]
         self._end_of_log = False
         self._ctx = None  # type: Optional[Context]
+        self._recovery_mode = recovery_mode
         self.set_log_index(reader.log_index)
 
     def set_log_index(self, index: int):
@@ -71,14 +74,15 @@ class Parser:
                                             map(lambda x: x.name, reader.field_defs[ftype]))
 
     @staticmethod
-    def load(path: str, log_index: int = 1) -> "Parser":
+    def load(path: str, log_index: int = 1, recovery_mode: bool = False) -> "Parser":
         """Factory method to create a parser for a log file.
 
         :param path: Path to blackbox log file
         :param log_index: Index within log file (defaults to 1)
+        :param recovery_mode: If True, skip P frames that don't have a preceding I frame
         :rtype: Parser
         """
-        return Parser(Reader(path, log_index))
+        return Parser(Reader(path, log_index), recovery_mode)
 
     def frames(self) -> Iterator[Frame]:
         """Return an iterator for the current frames.
@@ -142,6 +146,16 @@ class Parser:
                 ctx.add_frame(frame)
                 ctx.read_frame_count += 1
                 continue
+
+            # In recovery mode, skip P frames (INTER) that don't have a preceding I frame (INTRA)
+            if self._recovery_mode and ftype == FrameType.INTER:
+                # Check if we have seen at least one INTRA frame
+                if not ctx.has_seen_intra:
+                    _log.debug("Skipping {:s} Frame #{:d} due to no preceding I frame in recovery mode"
+                               .format(ftype.value, ctx.read_frame_count + 1))
+                    ctx.read_frame_count += 1
+                    ctx.invalid_frame_count += 1
+                    continue
 
             # validate frame
             current_time = ctx.get_current_value_by_name(ftype, "time")

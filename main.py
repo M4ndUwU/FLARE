@@ -2,6 +2,7 @@ import argparse, os
 import sqlite3
 import json
 import webbrowser
+import hashlib
 from datetime import datetime
 from modules.ardupilot_parse.df_parser import df_parser, df_recover
 from modules.betaflight_parse.bbl_parser import bbl_parser, bbl_recover
@@ -39,6 +40,14 @@ def get_match_types(type):
 
     return match_types
 
+def calculate_sha256(file_path):
+    """Calculate SHA256 hash of a file"""
+    sha256_hash = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for byte_block in iter(lambda: f.read(4096), b""):
+            sha256_hash.update(byte_block)
+    return sha256_hash.hexdigest()
+
 
 
 def main():
@@ -52,7 +61,7 @@ def main():
     parser.add_argument('-i', '--intact_filename', metavar='file.ulg', help='Input intact log file (optional in recovery mode)', default=None)
     parser.add_argument('-f', '--firmware', choices=['ardupilot', 'px4', 'betaflight'], help='Firmware type (required if intact log is not provided in recovery mode)', default=None)
     parser.add_argument('-o', '--output', dest='output', action='store', required=True, help='Output path of DB file')
-    parser.add_argument('-c', '--cluster_size', type=int, default=4096, help='Cluster size for parsing (default is 4096)')
+    parser.add_argument('-c', '--cluster_size', type=int, default=8192, help='Cluster size for parsing (default is 8192)')
     parser.add_argument('-v', '--view', action='store_true', help='Generate an HTML report and open it in a web browser.')
     parser.add_argument('--google-maps-key', dest='google_maps_key', help='Google Maps API key for enhanced map visualization (or set GOOGLE_MAPS_API_KEY environment variable)')
     # Validate that either intact_filename or firmware is provided
@@ -60,6 +69,17 @@ def main():
 
 
     log_file_name = args.filename
+    
+    # Calculate SHA256 hash before analysis
+    print("=" * 60)
+    print("Calculating SHA256 hash of input file before analysis...")
+    try:
+        hash_before = calculate_sha256(log_file_name)
+        print(f"SHA256 (before analysis): {hash_before}")
+    except Exception as e:
+        print(f"Error calculating SHA256 hash before analysis: {e}")
+        hash_before = None
+    
     # Remove the path and file extension from the filename.
     base_filename = os.path.splitext(os.path.basename(log_file_name))[0]
     # Add the current timestamp.
@@ -115,6 +135,31 @@ def main():
         else:
             df_parser(log_file_name, match_types, output)
     print("Finished. Result is in " + output)
+    
+    # Calculate SHA256 hash after analysis
+    print("=" * 60)
+    print("Calculating SHA256 hash of input file after analysis...")
+    try:
+        hash_after = calculate_sha256(log_file_name)
+        print(f"SHA256 (after analysis):  {hash_after}")
+    except Exception as e:
+        print(f"Error calculating SHA256 hash after analysis: {e}")
+        hash_after = None
+    
+    # Compare hashes
+    print("=" * 60)
+    print("Hash Comparison Result:")
+    if hash_before is not None and hash_after is not None:
+        if hash_before == hash_after:
+            print("Status: MATCH - File integrity verified (file unchanged)")
+            print(f"Both hashes: {hash_before}")
+        else:
+            print("Status: MISMATCH - File was modified during analysis")
+            print(f"Hash before: {hash_before}")
+            print(f"Hash after:  {hash_after}")
+    else:
+        print("Status: ERROR - Could not complete hash comparison")
+    print("=" * 60)
 
     if args.view:
         html_report_path = os.path.splitext(output)[0] + '.html'
@@ -153,6 +198,19 @@ def main():
 
     return output
 
+def safe_float(value, default=0.0):
+    """Safely convert value to float, handling None, empty strings, and invalid values"""
+    if value is None:
+        return default
+    if isinstance(value, str):
+        value = value.strip()
+        if not value or value == '':
+            return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
 def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps_api_key=None):
     """Generate HTML report with map and table visualization of GPS data"""
     conn = sqlite3.connect(db_path)
@@ -185,40 +243,102 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
     # Check if it's Betaflight (LOG_# tables)
     if not gps_data and any(table.startswith('LOG_') for table in tables):
         log_tables = [table for table in tables if table.startswith('LOG_')]
+        print(f"Checking Betaflight tables: {log_tables}")
         for table in log_tables:
-            # Try different possible column name formats for Betaflight
-            column_queries = [
-                f"""SELECT time, GPS_coord[0], GPS_coord[1], GPS_altitude, GPS_speed 
-                    FROM {table} 
-                    WHERE GPS_coord[0] IS NOT NULL AND GPS_coord[1] IS NOT NULL
-                    ORDER BY CAST(time AS INTEGER) ASC""",
-                f"""SELECT time, "GPS_coord[0]", "GPS_coord[1]", GPS_altitude, GPS_speed 
-                    FROM {table} 
-                    WHERE "GPS_coord[0]" IS NOT NULL AND "GPS_coord[1]" IS NOT NULL
-                    ORDER BY CAST(time AS INTEGER) ASC""",
-                f"""SELECT time, GPS_lat, GPS_lon, GPS_altitude, GPS_speed 
-                    FROM {table} 
-                    WHERE GPS_lat IS NOT NULL AND GPS_lon IS NOT NULL
-                    ORDER BY CAST(time AS INTEGER) ASC""",
-                f"""SELECT time, lat, lon, altitude, speed 
-                    FROM {table} 
-                    WHERE lat IS NOT NULL AND lon IS NOT NULL
-                    ORDER BY CAST(time AS INTEGER) ASC"""
-            ]
-            
-            for query in column_queries:
-                try:
+            try:
+                # Get table schema to find actual column names
+                cursor.execute(f"PRAGMA table_info(`{table}`)")
+                columns_info = cursor.fetchall()
+                column_names = [col[1] for col in columns_info]
+                print(f"Table {table} columns: {column_names}")
+                
+                # Find GPS-related columns
+                time_col = None
+                lat_col = None
+                lng_col = None
+                alt_col = None
+                speed_col = None
+                
+                # Find time column
+                for col in column_names:
+                    if any(x in col.lower() for x in ['time', 'timestamp']):
+                        time_col = col
+                        break
+                
+                # Find GPS coordinate columns - try different patterns
+                # Betaflight can have various GPS column names depending on firmware version
+                for col in column_names:
+                    col_lower = col.lower()
+                    # Check for GPS_coord[0] or GPS_coord[1] pattern (most common)
+                    if 'gps_coord' in col_lower and '[0]' in col:
+                        lat_col = col
+                    elif 'gps_coord' in col_lower and '[1]' in col:
+                        lng_col = col
+                    # Check for GPS_lat, GPS_lon
+                    elif 'gps_lat' in col_lower:
+                        lat_col = col
+                    elif 'gps_lon' in col_lower:
+                        lng_col = col
+                    # Check for other GPS coordinate patterns
+                    elif 'gps' in col_lower and 'lat' in col_lower:
+                        lat_col = col
+                    elif 'gps' in col_lower and ('lon' in col_lower or 'lng' in col_lower):
+                        lng_col = col
+                
+                # Find altitude and speed columns
+                for col in column_names:
+                    col_lower = col.lower()
+                    if not alt_col and 'gps' in col_lower and 'alt' in col_lower:
+                        alt_col = col
+                    elif not alt_col and 'alt' in col_lower:
+                        alt_col = col
+                    if not speed_col and 'gps' in col_lower and any(x in col_lower for x in ['speed', 'vel', 'spd']):
+                        speed_col = col
+                    elif not speed_col and any(x in col_lower for x in ['speed', 'vel', 'spd']):
+                        speed_col = col
+                
+                print(f"Found columns - time: {time_col}, lat: {lat_col}, lng: {lng_col}, alt: {alt_col}, speed: {speed_col}")
+                
+                # If we found time, lat, and lng, try to query
+                if time_col and lat_col and lng_col:
+                    # Always use backticks for all column names to handle special characters
+                    time_col_quoted = f"`{time_col}`"
+                    lat_col_quoted = f"`{lat_col}`"
+                    lng_col_quoted = f"`{lng_col}`"
+                    alt_col_quoted = f"`{alt_col}`" if alt_col else 'NULL'
+                    speed_col_quoted = f"`{speed_col}`" if speed_col else 'NULL'
+                    
+                    query = f"""
+                        SELECT {time_col_quoted}, {lat_col_quoted}, {lng_col_quoted}, {alt_col_quoted}, {speed_col_quoted}
+                        FROM `{table}`
+                        WHERE {lat_col_quoted} IS NOT NULL AND {lng_col_quoted} IS NOT NULL
+                        ORDER BY CAST({time_col_quoted} AS INTEGER) ASC
+                    """
+                    
+                    print(f"Executing query: {query[:200]}...")
                     cursor.execute(query)
                     table_data = cursor.fetchall()
                     if table_data:
                         gps_data.extend(table_data)
                         firmware_type = "Betaflight"
                         columns = ["Time (usec)", "Latitude", "Longitude", "Altitude", "Speed"]
+                        print(f"Found {len(table_data)} GPS data points in table {table}")
                         break
-                except sqlite3.OperationalError:
-                    continue
-            if gps_data:
-                break
+                    else:
+                        print(f"No GPS data found in table {table} (query succeeded but returned no rows)")
+                else:
+                    print(f"Missing required columns in table {table}: time={time_col}, lat={lat_col}, lng={lng_col}")
+            except sqlite3.OperationalError as e:
+                print(f"Error querying table {table}: {e}")
+                continue
+            except Exception as e:
+                print(f"Unexpected error with table {table}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        if gps_data:
+            print(f"Found {len(gps_data)} total GPS data points from Betaflight tables")
         
     # Check if it's PX4 (vehicle_gps_position_0 table)
     if not gps_data and 'vehicle_gps_position_0' in tables:
@@ -260,11 +380,18 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
                     alt_col = alt_cols[0] if alt_cols else 'NULL'
                     speed_col = speed_cols[0] if speed_cols else 'NULL'
                     
+                    # Use backticks for column names that might have special characters
+                    lat_col_quoted = f"`{lat_col}`" if '[' in lat_col or ' ' in lat_col else lat_col
+                    lng_col_quoted = f"`{lng_col}`" if '[' in lng_col or ' ' in lng_col else lng_col
+                    time_col_quoted = f"`{time_col}`" if '[' in time_col or ' ' in time_col else time_col
+                    alt_col_quoted = f"`{alt_col}`" if alt_col != 'NULL' and ('[' in alt_col or ' ' in alt_col) else alt_col
+                    speed_col_quoted = f"`{speed_col}`" if speed_col != 'NULL' and ('[' in speed_col or ' ' in speed_col) else speed_col
+                    
                     query = f"""
-                        SELECT {time_col}, {lat_col}, {lng_col}, {alt_col}, {speed_col}
-                        FROM {table}
-                        WHERE {lat_col} IS NOT NULL AND {lng_col} IS NOT NULL
-                        ORDER BY {time_col}
+                        SELECT {time_col_quoted}, {lat_col_quoted}, {lng_col_quoted}, {alt_col_quoted}, {speed_col_quoted}
+                        FROM `{table}`
+                        WHERE {lat_col_quoted} IS NOT NULL AND {lng_col_quoted} IS NOT NULL
+                        ORDER BY {time_col_quoted}
                     """
                     
                     cursor.execute(query)
@@ -291,11 +418,11 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
     for row in gps_data:
         if firmware_type == "Ardupilot":
             timestamp, lat, lng, alt, spd = row
-            # Convert to float for formatting, handle None values
-            lat_float = float(lat) if lat is not None else 0.0
-            lng_float = float(lng) if lng is not None else 0.0
-            alt_float = float(alt) if alt is not None else 0.0
-            spd_float = float(spd) if spd is not None else 0.0
+            # Convert to float for formatting, handle None and empty string values
+            lat_float = safe_float(lat)
+            lng_float = safe_float(lng)
+            alt_float = safe_float(alt)
+            spd_float = safe_float(spd)
             
             map_points.append({
                 'lat': lat_float,
@@ -308,11 +435,11 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
             
         elif firmware_type == "Betaflight":
             time, lat, lng, alt, spd = row
-            # Convert to float for formatting, handle None values
-            lat_float = float(lat) if lat is not None else 0.0
-            lng_float = float(lng) if lng is not None else 0.0
-            alt_float = float(alt) if alt is not None else 0.0
-            spd_float = float(spd) if spd is not None else 0.0
+            # Convert to float for formatting, handle None and empty string values
+            lat_float = safe_float(lat)
+            lng_float = safe_float(lng)
+            alt_float = safe_float(alt)
+            spd_float = safe_float(spd)
             
             map_points.append({
                 'lat': lat_float,
@@ -325,11 +452,11 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
             
         elif firmware_type == "PX4":
             timestamp, lat, lng, alt, vel = row
-            # Convert to float for formatting, handle None values
-            lat_float = float(lat) if lat is not None else 0.0
-            lng_float = float(lng) if lng is not None else 0.0
-            alt_float = float(alt) if alt is not None else 0.0
-            vel_float = float(vel) if vel is not None else 0.0
+            # Convert to float for formatting, handle None and empty string values
+            lat_float = safe_float(lat)
+            lng_float = safe_float(lng)
+            alt_float = safe_float(alt)
+            vel_float = safe_float(vel)
             
             map_points.append({
                 'lat': lat_float,
@@ -342,11 +469,11 @@ def generate_html_report(db_path, html_path, is_recovery_mode=False, google_maps
             
         else:  # Generic or Unknown firmware type
             timestamp, lat, lng, alt, spd = row
-            # Convert to float for formatting, handle None values
-            lat_float = float(lat) if lat is not None else 0.0
-            lng_float = float(lng) if lng is not None else 0.0
-            alt_float = float(alt) if alt is not None else 0.0
-            spd_float = float(spd) if spd is not None else 0.0
+            # Convert to float for formatting, handle None and empty string values
+            lat_float = safe_float(lat)
+            lng_float = safe_float(lng)
+            alt_float = safe_float(alt)
+            spd_float = safe_float(spd)
             
             map_points.append({
                 'lat': lat_float,

@@ -39,6 +39,7 @@ class Context:
         self.last_gps_home_frame = Frame(FrameType.GPS_HOME, b'')
         self.current_frame = tuple()  # the current (possibly yet incomplete) frame
         self.last_iter = -1
+        self.has_seen_intra = False  # track if we've seen at least one INTRA frame
         self._names_to_indices = dict()  # type: Dict[FrameType, Dict[str, int]]
         for ftype in FrameType:
             if ftype in self.field_defs:
@@ -65,6 +66,7 @@ class Context:
         if frame.type == FrameType.INTRA:
             # override history with current INTRA frame
             self.past_frames = (frame, frame, frame)
+            self.has_seen_intra = True
         elif frame.type == FrameType.GPS:
             self.last_gps_frame = frame
         elif frame.type == FrameType.GPS_HOME:

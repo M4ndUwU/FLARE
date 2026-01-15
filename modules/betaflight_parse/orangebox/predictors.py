@@ -65,14 +65,14 @@ def _increment(_: Number, ctx: Context) -> Number:
 @map_to(7, predictor_map)
 def _home_coord_0(new: Number, ctx: Context) -> Number:
     if not ctx.last_gps_home_frame.data:
-        return 0
+        return new  # Return delta value as-is if no GPS_HOME frame
     return new + ctx.last_gps_home_frame.data[0]
 
 
 @map_to(256, predictor_map)
 def _home_coord_1(new: Number, ctx: Context) -> Number:
     if not ctx.last_gps_home_frame.data:
-        return 0
+        return new  # Return delta value as-is if no GPS_HOME frame
     return new + ctx.last_gps_home_frame.data[1]
 
 

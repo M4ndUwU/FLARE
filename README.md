@@ -1,6 +1,7 @@
 # FLARE
 
 ![Python](https://img.shields.io/badge/python-3.12-blue)
+[![DOI](https://img.shields.io/badge/DOI-10.1016%2Fj.compeleceng.2026.111144-orange)](https://doi.org/10.1016/j.compeleceng.2026.111144)
 
 **Flight Log Analysis and REcovery for Open-Source Drones (Ardupilot, PX4, Betaflight)**  
 This tool is designed to analyze flight log files from custom drones, including logs from **PX4-ULog**, **Ardupilot-Dataflash**, and **Betaflight-Blackbox**. Additionally, it can recover corrupted log files, saving the parsed data into a database.
@@ -8,11 +9,39 @@ This tool is designed to analyze flight log files from custom drones, including 
 ---
 
 ## Table of Contents
-1. [Supported Message Types](#support-types)
-2. [Installation](#installation)
-3. [Usage](#usage)
-4. [Sample Files](#sample-files)
-5. [Dependencies](#dependencies)
+1. [Paper](#paper)
+2. [Supported Message Types](#support-types)
+3. [Installation](#installation)
+4. [Usage](#usage)
+5. [Sample Files](#sample-files)
+6. [Dependencies](#dependencies)
+
+---
+
+## Paper
+
+FLARE is the reference implementation of the following paper:
+
+> M. Seong, W. Yun, C. Lee, S. Lee, and J. Park,
+> "Flight log analysis and recovery for open-source drones: Focusing on ArduPilot, PX4, and Betaflight,"
+> *Computers and Electrical Engineering*, vol. 135, 2026.
+> https://doi.org/10.1016/j.compeleceng.2026.111144
+
+<details>
+<summary>BibTeX</summary>
+
+```bibtex
+@article{seong2026flare,
+  title   = {Flight log analysis and recovery for open-source drones: Focusing on ArduPilot, PX4, and Betaflight},
+  author  = {Seong, Mingyu and Yun, Woosung and Lee, Chulhan and Lee, Seokhee and Park, Jungheum},
+  journal = {Computers and Electrical Engineering},
+  volume  = {135},
+  year    = {2026},
+  doi     = {10.1016/j.compeleceng.2026.111144}
+}
+```
+
+</details>
 
 ---
 ## Support Message Types

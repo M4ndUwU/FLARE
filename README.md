@@ -315,10 +315,6 @@ These folders help illustrate how the tool works with actual log data. Feel free
 - PX4: [PX4 Log File](https://data.researchdatafinder.qut.edu.au/dataset/flight-logs-of4)
 - Betaflight: A log file without GPS information.
 
-
-note: Due to the conditions of blind review, it was necessary to omit certain details.
-We will make the related sample data, which we have generated, publicly available once the paper is published.
-
 ---
 
 ## Dependencies
